@@ -1,0 +1,89 @@
+# 01. View latest 100 requests
+tail -100 access.log
+
+# 02. Follow the log in real time
+tail -f access.log
+
+# 03. Count total requests
+wc -l access.log
+
+# 04. Top source IPs
+awk '{print $1}' access.log | sort | uniq -c | sort -nr | head -20
+
+# 05. Unique source IPs
+awk '{print $1}' access.log | sort -u
+
+# 06. Top requested URLs
+awk '{print $7}' access.log | sort | uniq -c | sort -nr | head -30
+
+# 07. Top HTTP methods
+awk '{print $6}' access.log | sort | uniq -c | sort -nr
+
+# 08. HTTP status-code distribution
+awk '{print $9}' access.log | sort | uniq -c | sort -nr
+
+# 09. Show all 404 responses
+awk '$9 == 404' access.log
+
+# 10. Top IPs generating 404s
+awk '$9 == 404 {print $1}' access.log | sort | uniq -c | sort -nr | head -20
+
+# 11. Show 4xx responses
+awk '$9 ~ /^4[0-9][0-9]$/' access.log
+
+# 12. Show 5xx responses
+awk '$9 ~ /^5[0-9][0-9]$/' access.log
+
+# 13. Top User-Agent strings
+awk -F'"' '{print $6}' access.log | sort | uniq -c | sort -nr | head -20
+
+# 14. Find SQL injection indicators
+grep -Ei 'union.*select|select.*from|or[[:space:]]+1=1|information_schema|sleep\(' access.log
+
+# 15. Find path traversal
+grep -Ei '\.\./|%2e%2e|%252e%252e' access.log
+
+# 16. Find command-injection indicators
+grep -Ei 'cmd=|command=|exec|system\(|shell_exec|passthru|/bin/bash|/bin/sh' access.log
+
+# 17. Find reverse-shell indicators
+grep -Ei '/dev/tcp/|bash[[:space:]]+-i|nc[[:space:]].*-e|ncat|netcat|socat' access.log
+
+# 18. Find sensitive-file access
+grep -Ei '/etc/passwd|/etc/shadow|\.ssh|id_rsa|authorized_keys' access.log
+
+# 19. Find exposed configuration files
+grep -Ei '/\.env|config\.php|wp-config|web\.config|settings\.py' access.log
+
+# 20. Find Git/SVN exposure
+grep -Ei '/\.git|/\.svn|/\.hg' access.log
+
+# 21. Find common admin-panel scanning
+grep -Ei 'wp-admin|wp-login|phpmyadmin|admin/login|administrator|xmlrpc' access.log
+
+# 22. Find directory/file scanning
+grep -Ei 'cgi-bin|\.bak|\.backup|\.old|\.zip|\.tar|\.sql|\.log|\.conf' access.log
+
+# 23. Top IPs making POST requests
+awk '$6 == "\"POST" {print $1}' access.log | sort | uniq -c | sort -nr | head -20
+
+# 24. Top IPs generating errors
+awk '$9 ~ /^[45][0-9][0-9]$/ {print $1}' access.log | sort | uniq -c | sort -nr | head -20
+
+# 25. IP + method + URL + status
+awk '{print $1,$6,$7,$9}' access.log | head -100
+
+# 26. Largest responses
+awk '{print $1,$7,$9,$10}' access.log | sort -k4 -nr | head -30
+
+# 27. Requests from a specific IP
+grep '^192\.168\.1\.100 ' access.log
+
+# 28. Top IP + URL combinations
+awk '{print $1,$7}' access.log | sort | uniq -c | sort -nr | head -30
+
+# 29. Extract potential external IPs
+grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' access.log | sort | uniq -c | sort -nr
+
+# 30. Quick suspicious-request sweep
+grep -Ei 'union|select|passwd|shadow|\.env|\.git|\.\./|cmd=|exec|system\(|/bin/sh|/bin/bash|wget|curl|nc |ncat|socat|wp-admin|phpmyadmin|xmlrpc' access.log
