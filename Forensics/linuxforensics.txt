@@ -1,0 +1,89 @@
+# 01. Identify file
+file capture.pcapng
+
+# 02. PCAP metadata
+capinfos capture.pcapng
+
+# 03. Packet count
+tshark -r capture.pcapng | wc -l
+
+# 04. Protocol hierarchy
+tshark -r capture.pcapng -q -z io,phs
+
+# 05. IP conversations
+tshark -r capture.pcapng -q -z conv,ip
+
+# 06. TCP conversations
+tshark -r capture.pcapng -q -z conv,tcp
+
+# 07. UDP conversations
+tshark -r capture.pcapng -q -z conv,udp
+
+# 08. Top source IPs
+tshark -r capture.pcapng -T fields -e ip.src | sort | uniq -c | sort -nr | head -20
+
+# 09. Top destination IPs
+tshark -r capture.pcapng -T fields -e ip.dst | sort | uniq -c | sort -nr | head -20
+
+# 10. Unique IP addresses
+tshark -r capture.pcapng -T fields -e ip.src -e ip.dst | tr '\t' '\n' | sort -u
+
+# 11. DNS queries
+tshark -r capture.pcapng -Y 'dns.flags.response == 0' -T fields -e ip.src -e dns.qry.name
+
+# 12. Top DNS domains
+tshark -r capture.pcapng -Y dns.qry.name -T fields -e dns.qry.name | sort | uniq -c | sort -nr | head -30
+
+# 13. HTTP requests
+tshark -r capture.pcapng -Y http.request -T fields -e ip.src -e ip.dst -e http.request.method -e http.host -e http.request.uri
+
+# 14. HTTP User-Agents
+tshark -r capture.pcapng -Y http.user_agent -T fields -e ip.src -e http.host -e http.user_agent
+
+# 15. TLS SNI
+tshark -r capture.pcapng -Y tls.handshake.extensions_server_name -T fields -e ip.src -e ip.dst -e tls.handshake.extensions_server_name
+
+# 16. TCP SYN scan candidates
+tshark -r capture.pcapng -Y 'tcp.flags.syn==1 && tcp.flags.ack==0' -T fields -e ip.src -e ip.dst -e tcp.dstport
+
+# 17. TCP retransmissions
+tshark -r capture.pcapng -Y tcp.analysis.retransmission
+
+# 18. TCP RST packets
+tshark -r capture.pcapng -Y 'tcp.flags.reset==1'
+
+# 19. List TCP streams
+tshark -r capture.pcapng -T fields -e tcp.stream | sort -nu
+
+# 20. Follow TCP stream 0
+tshark -r capture.pcapng -q -z follow,tcp,ascii,0
+
+# 21. Extract TCP stream payload
+tshark -r capture.pcapng -Y 'tcp.stream==0' -T fields -e tcp.payload
+
+# 22. ARP analysis
+tshark -r capture.pcapng -Y arp -T fields -e arp.src.proto_ipv4 -e arp.src.hw_mac -e arp.dst.proto_ipv4 -e arp.dst.hw_mac
+
+# 23. ICMP analysis
+tshark -r capture.pcapng -Y icmp -T fields -e ip.src -e ip.dst -e icmp.type -e icmp.code
+
+# 24. Top destination ports
+tshark -r capture.pcapng -T fields -e tcp.dstport -e udp.dstport | tr '\t' '\n' | sort | uniq -c | sort -nr | head -30
+
+# 25. Largest packets
+tshark -r capture.pcapng -T fields -e frame.number -e ip.src -e ip.dst -e frame.len | sort -t$'\t' -k4 -nr | head -50
+
+# 26. Search packet strings
+strings capture.pcapng | grep -Ei 'flag|password|passwd|secret|token|key|admin'
+
+# 27. Extract HTTP objects
+mkdir -p extracted && tshark -r capture.pcapng --export-objects http,extracted
+
+# 28. Identify extracted files
+find extracted -type f -exec file {} \;
+
+# 29. Hash extracted files
+find extracted -type f -exec sha256sum {} \;
+
+# 30. Open in Wireshark
+wireshark capture.pcapng
