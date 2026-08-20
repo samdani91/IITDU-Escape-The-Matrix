@@ -3,7 +3,7 @@ IITCTF — Challenge 1
 
 Challenge Title
 ---------------
-21 or Nothing
+All or Nothing
 
 Category
 --------
@@ -67,3 +67,4 @@ This is a local binary reverse-engineering challenge.
 Do NOT host this challenge using nc.
 
 Distribute only the `blackjack` binary to players.
+
