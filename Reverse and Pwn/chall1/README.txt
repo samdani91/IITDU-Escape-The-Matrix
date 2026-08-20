@@ -60,6 +60,8 @@ Flag
 -----------
 IITCTF{h1tM3_w1th_Th3Fl4g}
 
+Author - AribZobair
+
 Organizer Notes
 ---------------
 This is a local binary reverse-engineering challenge.
