@@ -1,4 +1,4 @@
-IITCTF — Challenge 4
+IITCTF — Challenge 3
 ======================
 
 Challenge Title
@@ -76,7 +76,7 @@ Hints
 
 Flag Format
 -----------
-IITCTF{...}
+IITCTF{ch00s3_w1s3ly_pwn3r}
 
 Organizer Notes
 ---------------
