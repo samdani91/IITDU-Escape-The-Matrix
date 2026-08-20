@@ -56,9 +56,9 @@ Recommended:
 - strings
 - objdump (optional)
 
-Flag Format
+Flag
 -----------
-IITCTF{...}
+IITCTF{h1tM3_w1th_Th3Fl4g}
 
 Organizer Notes
 ---------------
