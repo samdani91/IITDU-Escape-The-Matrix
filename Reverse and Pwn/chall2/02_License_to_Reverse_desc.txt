@@ -66,9 +66,9 @@ Hints
 - After successful activation, inspect the success path for
   another layer of obfuscation.
 
-Flag Format
+Flag 
 -----------
-IITCTF{...}
+IITCTF{4ct1v4t10n_5ucc355}
 
 Author: AribZobair
 
