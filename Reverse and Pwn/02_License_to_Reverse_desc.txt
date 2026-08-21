@@ -1,0 +1,82 @@
+IITCTF — Challenge 2
+======================
+
+Challenge Title
+---------------
+License to Reverse
+
+Category
+--------
+Reverse Engineering
+
+Difficulty
+----------
+Medium
+
+Description
+-----------
+IIT Secure Suite is asking for an activation key.
+
+Unfortunately, nobody seems to know what the correct key is.
+
+The software generates a Product ID when it starts and expects
+an activation key corresponding to that Product ID.
+
+Can you reverse engineer the activation mechanism and activate
+the software?
+
+Files
+-----
+IITSecureActivator
+
+How to Run
+----------
+    chmod +x IITSecureActivator
+    ./IITSecureActivator
+
+Objective
+---------
+1. Run the program and record the Product ID.
+2. Reverse engineer the binary in Ghidra.
+3. Recover the Product ID → activation-key derivation.
+4. Calculate the correct activation key for the current run.
+5. Activate the software.
+6. Inspect the successful activation path and recover the flag.
+
+Important
+---------
+The Product ID is generated when the program starts.
+
+Therefore, an activation key calculated for one execution will
+not necessarily work after restarting the program.
+
+Recommended Tools
+-----------------
+- Ghidra
+- Python
+- strings
+- objdump (optional)
+
+Hints
+-----
+- Start from main and follow the validation path.
+- Look for the function responsible for deriving key material.
+- Embedded byte arrays are important.
+- The final key uses an alphanumeric character mapping.
+- After successful activation, inspect the success path for
+  another layer of obfuscation.
+
+Flag Format
+-----------
+IITCTF{...}
+
+Organizer Notes
+---------------
+This is a local binary reverse-engineering challenge.
+
+Do NOT host this challenge using nc.
+
+Distribute only the `IITSecureActivator` binary.
+
+A single binary is sufficient; no per-player key database or
+organizer CSV is required.
