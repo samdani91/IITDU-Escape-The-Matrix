@@ -1,0 +1,7 @@
+services:
+  iitctf-banking:
+    build: .
+    container_name: iitctf-banking-under-pressure
+    ports:
+      - "8084:8084"
+    restart: unless-stopped
