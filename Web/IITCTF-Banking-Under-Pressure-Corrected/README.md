@@ -1,8 +1,23 @@
 # IITCTF — Banking Under Pressure (Corrected)
 
-**Category:** Web / Business Logic / BOLA / Race Condition  
-**Difficulty:** Upper-Medium  
-**Flag:** `IITCTF{...}`
+Category: Web / Business Logic / Race Condition
+Difficulty: Upper-Medium
+
+Welcome to NovaBank, a modern online banking platform.
+
+Users can register and log in using their account credentials. After logging in, users can view their account balance, add funds, withdraw money, and transfer funds to other registered users.
+
+The banking system appears to enforce balance checks before processing transfers. However, the transaction system may behave unexpectedly when multiple requests are processed at nearly the same time.
+
+Your objective is to investigate the application's API and transaction logic, identify weaknesses in its authorization and transaction handling, and ultimately reach the protected challenge condition.
+
+Can you find a way to manipulate the banking workflow and retrieve the flag?
+
+Objective: Exploit the application's business-logic weaknesses and retrieve the flag.
+
+Difficulty: Upper-Medium
+Category: Web / Business Logic / BOLA / Race Condition
+Flag Format: IITCTF{...}
 
 ## Scenario
 
