@@ -1,0 +1,265 @@
+IITCTF — THE LAST HUNT WRITEUP
+===============================
+
+FLAG
+----
+IITCTF{th3_r4bb1t_0utran_th3_hunt3r}
+
+
+1. RECOGNIZE THE MATHEMATICAL STRUCTURE
+---------------------------------------
+
+The challenge says that the rabbit's position is transformed by the
+same rule every seven jumps.
+
+The checkpoints are:
+
+    S0
+    S7
+    S14
+
+and:
+
+    S7  = A7 * S0 (mod P)
+    S14 = A7 * S7 (mod P)
+
+The important observation is that the unknown object is a 2x2 matrix.
+
+We do NOT need to recover the original one-jump matrix M.
+
+The challenge can be solved directly using the seven-jump matrix:
+
+    A7 = M^7
+
+
+2. RECOVER A7
+-------------
+
+Write the two known vector equations together as a matrix equation.
+
+Let:
+
+    X = [ S0  S7 ]
+
+and:
+
+    Y = [ S7  S14 ]
+
+Then:
+
+    Y = A7 * X
+
+Therefore:
+
+    A7 = Y * X^(-1)  (mod P)
+
+This requires finding the modular inverse of the 2x2 matrix X.
+
+For:
+
+    P = 1000000007
+
+the required modular arithmetic is performed modulo P.
+
+
+3. MODULAR 2x2 MATRIX INVERSE
+-----------------------------
+
+For:
+
+    X = [a b]
+        [c d]
+
+the determinant is:
+
+    det = ad - bc
+
+Modulo P:
+
+    det_inv = det^(-1) mod P
+
+Then:
+
+    X^(-1) = det_inv * [ d  -b ]
+                       [ -c  a ]  (mod P)
+
+The determinant is non-zero modulo P for the supplied challenge data,
+so the inverse exists.
+
+
+4. RECOVERED MATRIX
+-------------------
+
+The resulting seven-jump transformation is:
+
+    A7 = ((945981999, 978708842), (245855765, 401753053))
+
+This is the transformation corresponding to exactly seven rabbit
+jumps.
+
+
+5. COMPUTE THE FINAL STATE
+--------------------------
+
+The hunter followed 17 groups of seven jumps.
+
+Therefore:
+
+    S_final = A7^17 * S0 (mod P)
+
+Use fast matrix exponentiation rather than multiplying the matrix
+seventeen times manually.
+
+The resulting state is:
+
+    S_final = (964757029, 836821848)
+
+
+6. KEY DERIVATION
+-----------------
+
+The challenge defines:
+
+    material =
+        str(x) + ":" + str(y) + "::THE_LAST_HUNT::rabbit"
+
+So:
+
+    material =
+        "964757029:836821848::THE_LAST_HUNT::rabbit"
+
+Then:
+
+    seed = SHA256(material)
+
+The seed is used to create a keystream.
+
+
+7. DECRYPT THE CIPHERTEXT
+-------------------------
+
+For block number i:
+
+    block_i = SHA256(seed || i.to_bytes(4, "big"))
+
+Concatenate the blocks and XOR them with the supplied ciphertext.
+
+The plaintext becomes:
+
+    IITCTF{th3_r4bb1t_0utran_th3_hunt3r}
+
+
+8. COMPLETE SOLVE PATH
+----------------------
+
+    Public checkpoints
+           |
+           v
+    S7 = A7*S0
+    S14 = A7*S7
+           |
+           v
+    Y = A7*X
+           |
+           v
+    A7 = Y*X^-1 mod P
+           |
+           v
+    Compute A7^17
+           |
+           v
+    S_final
+           |
+           v
+    SHA-256 key derivation
+           |
+           v
+    SHA-256 XOR keystream
+           |
+           v
+    FLAG
+
+
+9. WHY THE "SEVEN JUMPS" MATTERS
+---------------------------------
+
+The rabbit does not expose the one-jump matrix directly.
+
+The hunter only observes the system every seven jumps.
+
+Consequently, the observable transformation is:
+
+    A7 = M^7
+
+The player does not need to recover M at all.
+
+This is an intentional part of the challenge design: recognizing that
+the seven-jump transformation itself is sufficient makes the problem
+much cleaner.
+
+
+10. WHY THIS IS HARD
+--------------------
+
+The challenge requires several steps:
+
+    - Recognize a linear algebra structure.
+    - Treat positions as vectors.
+    - Recover an unknown matrix using modular arithmetic.
+    - Compute a modular matrix inverse.
+    - Perform matrix exponentiation.
+    - Understand the seven-jump observation interval.
+    - Derive a cryptographic key from the resulting state.
+    - Reproduce a SHA-256-based keystream.
+    - XOR-decrypt the final message.
+
+The individual operations are manageable, but the intended difficulty
+comes from connecting them together.
+
+
+11. ORGANIZER NOTES
+-------------------
+
+Player-facing file:
+
+    challenge.txt
+
+Keep organizer-side:
+
+    generate_reference.py
+    writeup.txt
+    README.txt
+
+This challenge is intentionally offline/downloadable.
+
+No nc service is required.
+
+The flag is NOT included in plaintext in challenge.txt.
+
+
+12. REFERENCE VALUES
+-------------------
+
+Original one-jump matrix (organizer reference only):
+
+    M = ((137, 911), (283, 503))
+
+Initial state:
+
+    S0 = (194723, 837421)
+
+Seven-jump matrix:
+
+    A7 = ((945981999, 978708842), (245855765, 401753053))
+
+Checkpoint 1:
+
+    S7 = (782941194, 212834238)
+
+Checkpoint 2:
+
+    S14 = (767842069, 154330161)
+
+Final state after 17 cycles:
+
+    S_final = (964757029, 836821848)
