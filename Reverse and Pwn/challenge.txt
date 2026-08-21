@@ -1,0 +1,109 @@
+THE LAST HUNT
+=============
+
+Category: Crypto
+Difficulty: Hard
+
+STORY
+-----
+
+For eleven nights, a hunter has followed the same rabbit.
+
+The rabbit never runs randomly.
+
+Every seven jumps, its position is transformed by the same
+two-dimensional rule. The hunter's notebook contains only the
+positions that were visible after each group of seven jumps.
+
+The last page contains a warning:
+
+    "It isn't running away from me.
+     It is following the matrix."
+
+The hunter managed to recover three checkpoints before the trail
+disappeared.
+
+Recover the rabbit's final state and decrypt what it was carrying.
+
+PUBLIC PARAMETERS
+-----------------
+
+Prime modulus:
+
+    P = 1000000007
+
+Rabbit position is represented as a column vector:
+
+    S = [x]
+        [y]
+
+The notebook records:
+
+    Checkpoint 0:
+        S0  = [194723]
+              [837421]
+
+    Checkpoint 1 (after 7 jumps):
+        S7  = [782941194]
+              [212834238]
+
+    Checkpoint 2 (after 14 jumps):
+        S14 = [767842069]
+              [154330161]
+
+The same transformation is applied every seven jumps:
+
+    S_(n+1) = A7 * S_n (mod P)
+
+The hunter followed the rabbit for 17 such seven-jump cycles.
+
+Therefore the required state is:
+
+    S_final = A7^17 * S0 (mod P)
+
+KEY DERIVATION
+--------------
+
+After recovering S_final = (x, y), construct:
+
+    material = str(x) + ":" + str(y) + "::THE_LAST_HUNT::rabbit"
+
+The SHA-256 digest of that material is the key seed.
+
+The ciphertext is XORed with a SHA-256 keystream generated from that
+seed:
+
+    block_0 = SHA256(seed || 4-byte big-endian 0)
+    block_1 = SHA256(seed || 4-byte big-endian 1)
+    ...
+
+Concatenate blocks and XOR them with the ciphertext.
+
+CIPHERTEXT
+----------
+
+2ecf6fb75a2208a7e08c5dc41d97ad6a9d17c7484fa81370b77054f64486ea3a44f1f231
+
+OBJECTIVE
+---------
+
+Recover the flag.
+
+PLAYER HINTS
+------------
+
+Hint 1:
+    "The hunter did not record every jump."
+
+Hint 2:
+    "The same transformation happens seven times between checkpoints."
+
+Hint 3:
+    "You do not need to guess the matrix. Two independent position
+     vectors are enough to recover a 2x2 linear transformation."
+
+Hint 4:
+    "Once you have the seven-jump transformation, seventeen cycles
+     is a matrix exponentiation problem."
+
+No source code is required to solve the challenge.
