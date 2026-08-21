@@ -1,0 +1,12 @@
+services:
+  iitctf-os-command-injection:
+    build: .
+    container_name: iitctf-os-command-injection
+    ports:
+      - "8080:8080"
+    volumes:
+      - flag_data:/flagdata
+    restart: unless-stopped
+
+volumes:
+  flag_data:

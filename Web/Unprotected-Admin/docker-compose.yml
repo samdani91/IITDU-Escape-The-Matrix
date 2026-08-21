@@ -1,0 +1,7 @@
+services:
+  iitctf-access-control:
+    build: .
+    container_name: iitctf-access-control
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
