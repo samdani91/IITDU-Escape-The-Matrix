@@ -1,5 +1,21 @@
 # IITCTF — Professional OS Command Injection
 
+Describtion:
+
+Product Stock Management Portal
+
+Welcome to the university's internal inventory management portal. Authorized users can check the stock availability of different products through the system.
+
+The application appears to process product information normally, but something interesting may be happening behind the scenes.
+
+Can you find a way to interact with the server beyond the intended functionality and retrieve the hidden flag?
+
+Objective: Exploit the web application's command execution vulnerability and retrieve the flag.
+
+Category: Web / OS Command Injection
+Difficulty: Easy–Medium
+Flag Format: IITCTF{...}
+
 ## Run
 ```bash
 docker compose up --build
