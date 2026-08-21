@@ -1,6 +1,20 @@
 # IITCTF — SQL Injection: Hidden Data
 
-Modern university inventory console for an authorized SQL injection CTF.
+University Store
+
+Welcome to the university's internal store portal. Students can check the availability of products using the provided product ID.
+
+The portal appears to work normally, but the way product information is processed may not be as secure as it seems. Some products are hidden from the regular inventory view.
+
+Can you manipulate the product search functionality to access the hidden inventory and retrieve the flag?
+
+Objective: Exploit the SQL injection vulnerability and retrieve the hidden product and flag.
+
+Difficulty: Easy
+
+Category: Web / SQL Injection
+
+Flag Format: IITCTF{...}
 
 ## Run
 
