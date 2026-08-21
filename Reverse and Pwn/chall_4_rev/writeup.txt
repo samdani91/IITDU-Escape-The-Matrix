@@ -1,0 +1,389 @@
+IITCTF — GHOST PROTOCOL
+========================
+
+Category:
+Reverse Engineering
+
+Difficulty:
+Medium-Hard
+
+Flag:
+IITCTF{gh05t_pr0t0c0l_unf0ld3d}
+
+Author:
+Created by AribZobair
+
+
+1. SCENARIO
+-----------
+
+The machine was recovered from a sealed laboratory after an
+unexplained system failure.
+
+Most research data was destroyed.
+
+One executable survived.
+
+It identifies itself only as:
+
+    GHOST
+
+The terminal still responds to commands, but the original protocol
+appears to have been partially erased.
+
+The objective is to reconstruct the hidden protocol and recover the
+deleted memory fragment.
+
+
+2. PLAYER EXPERIENCE
+--------------------
+
+Running the binary displays:
+
+    RECOVERED TERMINAL
+    CASE 17
+
+    IDENT: GHOST
+
+    Available commands:
+      ping
+      status
+      reset
+      auth
+      sync
+
+    GHOST PROTOCOL: INACTIVE
+
+The documented commands do not reveal the complete protocol.
+
+A useful first observation is the message:
+
+    [!] Some legacy commands may still exist.
+
+This is a clue that additional functionality may exist inside the
+binary even though it is not shown by the interface.
+
+
+3. START IN GHIDRA
+------------------
+
+Load `ghost_protocol` into Ghidra and open the `main` function.
+
+Follow the command-dispatch logic.
+
+The player should notice that the program compares the input
+against more commands than the initial interface advertises.
+
+The hidden/legacy commands are:
+
+    trace
+    recover
+    purge
+
+This is the first major discovery.
+
+The intended lesson is that the terminal's visible interface is not
+necessarily a complete representation of the binary's functionality.
+
+
+4. FIND THE STATE VARIABLE
+--------------------------
+
+Follow calls from the command handlers into the state-update
+function.
+
+The program maintains a 16-bit internal state.
+
+The important transformations are:
+
+    ping:
+        state ^= 0x13
+
+    sync:
+        state = ROL16(state, 3)
+        state ^= 0x2B
+
+    trace:
+        state ^= 0xA7
+        state += 0x29
+
+    status:
+        state = state * 5 + 0x11
+
+    recover:
+        state ^= 0xD1
+        state = ROL16(state, 5)
+
+    purge:
+        state ^= 0xFFFF
+
+
+5. FIND THE SUCCESS CONDITION
+-----------------------------
+
+Continue following the state variable.
+
+Eventually the player finds that the recovery routine is triggered
+when:
+
+    state == 0x6D47
+
+The initial state is:
+
+    state = 0
+
+Therefore the problem becomes:
+
+    Find a sequence of commands that transforms
+    0x0000 into 0x6D47.
+
+
+6. SOLVING THE STATE MACHINE
+----------------------------
+
+The player can solve this manually or write a small Python script
+that reproduces the state transitions.
+
+A simple BFS/DFS is sufficient because the state space and command
+set are small.
+
+The six useful state-changing commands are:
+
+    ping
+    sync
+    trace
+    status
+    recover
+    purge
+
+One valid sequence for this exact binary is:
+
+    sync
+    recover
+    status
+    sync
+    status
+    ping
+
+State progression:
+
+    Initial:
+        0x0000
+
+    sync:
+        state = ROL16(0x0000, 3) ^ 0x2B
+              = 0x002B
+
+    recover:
+        state = ROL16(0x002B ^ 0xD1, 5)
+              = ...
+
+    status:
+        ...
+
+    sync:
+        ...
+
+    status:
+        ...
+
+    ping:
+        0x6D47
+
+The exact arithmetic can be reproduced directly from the
+decompiled update function.
+
+Entering the sequence in the terminal causes:
+
+    [+] Protocol state accepted.
+
+
+7. THE SECOND RE LAYER
+----------------------
+
+The challenge does not store the flag as plaintext.
+
+After the magic state is reached, execution enters the recovery
+function.
+
+Ghidra reveals an encoded byte array:
+
+    blob[]
+
+The decoding loop is:
+
+    mask = 0x41 + (i * 17) % 0x5D
+    mask ^= (state & 0xFF)
+
+    plaintext[i] = blob[i] ^ mask
+
+
+8. RECOVERING THE FLAG
+----------------------
+
+Because the successful state is:
+
+    0x6D47
+
+the state-dependent byte is:
+
+    0x47
+
+The player can reproduce the decoding operation in Python:
+
+    state = 0x6D47
+
+    for i, b in enumerate(blob):
+        mask = (0x41 + (i * 17) % 0x5D) ^ (state & 0xFF)
+        print(chr(b ^ mask), end="")
+
+This reconstructs:
+
+    IITCTF{gh05t_pr0t0c0l_unf0ld3d}
+
+
+9. COMPLETE SOLVE PATH
+----------------------
+
+The intended player journey is:
+
+    ghost_protocol
+          |
+          v
+       Ghidra
+          |
+          v
+      Analyze main()
+          |
+          v
+    Find hidden commands
+          |
+          v
+    Find update_state()
+          |
+          v
+   Reconstruct state machine
+          |
+          v
+   Find magic state 0x6D47
+          |
+          v
+    Solve command sequence
+          |
+          v
+    Reach recovery routine
+          |
+          v
+    Analyze encoded blob
+          |
+          v
+   Reverse position-dependent XOR
+          |
+          v
+IITCTF{gh05t_pr0t0c0l_unf0ld3d}
+
+
+10. PLAYER HINT SYSTEM
+----------------------
+
+The challenge is intended to be Medium-Hard, so hints can be released
+progressively rather than giving the solution immediately.
+
+Hint 1:
+    "The terminal doesn't show everything it knows."
+
+This should encourage players to inspect the binary rather than
+guessing commands.
+
+Hint 2:
+    "Find where the command entered by the user is compared against
+     known strings."
+
+This leads players toward the command-dispatch logic and the hidden
+legacy commands.
+
+Hint 3:
+    "The program is waiting for a particular internal state, not a
+     particular password."
+
+This points players toward the state variable and the magic-state
+comparison.
+
+Hint 4:
+    "The flag is recovered from memory only after the protocol state
+     is accepted."
+
+This points players toward the encoded blob and recovery routine.
+
+
+11. WHY THIS IS MEDIUM-HARD
+---------------------------
+
+Ghost Protocol has several layers rather than one direct password
+comparison.
+
+The player must:
+
+    1. Navigate the binary in Ghidra.
+    2. Discover undocumented commands.
+    3. Identify the state variable.
+    4. Reverse the state transformations.
+    5. Solve for a valid command sequence.
+    6. Locate the recovery routine.
+    7. Reverse the position-dependent XOR.
+    8. Recover the flag.
+
+The difficulty comes from connecting these pieces rather than from
+heavy obfuscation.
+
+
+12. ORGANIZER BUILD
+-------------------
+
+    chmod +x build.sh
+    ./build.sh
+
+The player-facing file is:
+
+    ghost_protocol
+
+Do not distribute:
+
+    ghost_protocol.c
+    build.sh
+    writeup.txt
+
+
+13. DEPLOYMENT
+--------------
+
+This is a local downloadable Reverse Engineering challenge.
+
+No nc service is required.
+
+Give players only:
+
+    ghost_protocol
+
+
+14. FINAL TESTING CHECKLIST
+---------------------------
+
+Before deployment:
+
+    [ ] Binary starts normally.
+    [ ] Documented commands work.
+    [ ] Legacy commands can be discovered through reversing.
+    [ ] State transitions are correct.
+    [ ] 0x6D47 is the successful state.
+    [ ] The intended command sequence works.
+    [ ] Recovery routine executes.
+    [ ] Flag is correctly decoded.
+    [ ] `strings ghost_protocol | grep IITCTF` returns nothing.
+    [ ] Source and writeup are not included in the player package.
+
+
+15. FLAG
+--------
+
+IITCTF{gh05t_pr0t0c0l_unf0ld3d}
