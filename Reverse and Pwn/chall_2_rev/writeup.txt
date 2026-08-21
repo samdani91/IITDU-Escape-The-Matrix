@@ -1,0 +1,28 @@
+IITCTF — IIT Secure Suite Activation
+
+Category: Reverse Engineering
+Difficulty: Medium
+
+Flag:
+IITCTF{4ct1v4t10n_5ucc355}
+
+1. Run the binary and record the Product ID. It changes every run.
+2. Open the binary in Ghidra.
+3. Find the Product-ID parsing function.
+4. Recover the 15-byte material derivation.
+5. Recover the transformation using the embedded A and B arrays.
+6. Recover the final A-Z/0-9 character mapping.
+7. Calculate the key for the Product ID from the current run.
+8. Enter the key without restarting the program.
+9. After activation, inspect the encoded flag in the success function.
+10. Reverse the position-dependent XOR to recover the flag.
+
+Important:
+The Product ID and activation key are dynamic. A key from one run
+will not be valid after restarting the program.
+
+Organizer:
+Generate the single distributed binary with:
+    python3 generate_instances.py
+
+Upload only IITSecureActivator.
