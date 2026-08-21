@@ -1,7 +1,7 @@
 services:
   iitctf-access-control:
     build: .
-    container_name: iitctf-access-control
+    container_name: iitctf-unprotected-admin
     ports:
       - "8081:8080"
     restart: unless-stopped

@@ -1,0 +1,7 @@
+services:
+  iitctf-sqli:
+    build: .
+    container_name: iitctf-sqli-hidden-data
+    ports:
+      - "8083:8080"
+    restart: unless-stopped
