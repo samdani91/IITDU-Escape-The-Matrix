@@ -1,0 +1,42 @@
+IITCTF — DEAD DROP WRITEUP
+
+Flag:
+IITCTF{d3ad_dr0p_r3v3rs3d}
+
+1. The binary expects a 12-character drop code.
+
+2. In Ghidra, locate the validation routine. Input characters are
+   processed using this permutation:
+
+       [7, 2, 10, 0, 8, 5, 11, 3, 9, 1, 6, 4]
+
+3. For each position i:
+
+       x = input[order[i]]
+       x ^= key[i]
+       x += (i * 3 + 7)
+
+   The result is compared against the embedded expected array.
+
+4. Reverse the operations:
+
+       x = expected[i] - (i * 3 + 7)
+       x ^= key[i]
+
+   Put each recovered character back at input[order[i]].
+
+5. The recovered drop code is:
+
+       D3ADdr0pX42!
+
+6. After the correct code is accepted, the success function decodes
+   the sealed package fragment with:
+
+       plaintext[i] = sealed_fragment[i] ^ 0x5A
+
+7. The decoded package contains:
+
+       IITCTF{d3ad_dr0p_r3v3rs3d}
+
+The flag is deliberately not stored as plaintext, so a simple
+`strings dead_drop | grep IITCTF` does not solve the challenge.
