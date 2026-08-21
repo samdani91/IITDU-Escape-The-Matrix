@@ -1,6 +1,16 @@
 # IITCTF — Unprotected Admin Functionality
 
-A local Docker CTF challenge inspired by the unprotected-administration access-control scenario.
+Welcome to the university's student portal. Students can log in using their university-provided ID and password to access their academic information and services.
+
+However, the portal also has a super administrator account with access to functionality that regular students cannot use.
+
+Can you discover the administrator's account and access the restricted functionality?
+
+Objective: Gain access to the administrator area and retrieve the flag.
+
+Difficulty: Easy
+Category: Web / Access Control
+Flag Format: IITCTF{...}
 
 ## Run
 
